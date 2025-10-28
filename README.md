@@ -332,6 +332,40 @@ python main.py --demo hybrid
 - Structured text (console).  
 - Grounded, non-hallucinated reasoning pipeline result.
 
+## 🔄 Integration Flow
+
+Here’s what happens when `--demo hybrid` runs:
+
+```
+1️⃣ RuleDetector → extracts signals from Okta logs.
+2️⃣ Reasoning Chain → summarizes into a prioritized risk list.
+3️⃣ Planner Agent → converts that list into 3–5 short containment steps.
+4️⃣ Executor Agent → translates steps into jq/awk/grep commands.
+```
+
+### Dataflow Diagram
+
+```
+Okta JSONL Logs
+   │
+   ▼
+RuleDetector ───► Signals
+   │
+   ▼
+Reasoning Chain (LCEL)
+   │        —> structured, concise risk summary
+   ▼
+Planner Agent (SimpleAgent)
+   │        —> converts summary into actionable steps
+   ▼
+Executor Agent (SimpleAgent)
+   │        —> converts steps into jq/awk/grep shell commands ($FILE=okta-logs.txt)
+   ▼
+Operator Output (dry-run script)
+```
+
+
+
 ---
 
 ### 7⃣ Run All Demos Sequentially
@@ -411,9 +445,12 @@ agentic-threat-analyst-okta/
 
 ## 🧾 License
 
-Open-sourced under **MIT**.  
+Open-sourced under **GPLv3**.  
 All AI reasoning components run locally — no data leaves your machine.
 
 ---
 
+**Author:** Jared Evans  
+**Institution:** Gallaudet University  
+**License:** GPLv3  
 **Keywords:** Okta, cybersecurity, LangChain, Hugging Face, AutoGen, agentic AI, rule-based detection, explainable AI
