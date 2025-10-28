@@ -445,12 +445,9 @@ agentic-threat-analyst-okta/
 
 ## 🧾 License
 
-Open-sourced under **GPLv3**.  
+Open-sourced under **MIT**.  
 All AI reasoning components run locally — no data leaves your machine.
 
 ---
 
-**Author:** Jared Evans  
-**Institution:** Gallaudet University  
-**License:** GPLv3  
 **Keywords:** Okta, cybersecurity, LangChain, Hugging Face, AutoGen, agentic AI, rule-based detection, explainable AI
