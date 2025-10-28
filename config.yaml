@@ -1,0 +1,12 @@
+# Configuration for deterministic rules and model defaults
+
+model:
+  hf_model: microsoft/Phi-3-mini-4k-instruct
+  max_new_tokens: 384
+  temperature: 0.0
+
+rules:
+  failed_login_window_min: 60
+  failed_per_user: 8
+  failed_per_ip: 20
+  impossible_travel_window: 90
