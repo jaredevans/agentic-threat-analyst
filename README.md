@@ -147,9 +147,9 @@ python main.py --demo rules
 
   ```
   == Rule-based findings ==
-  MEDIUM  excessive_failed_logins_user     user alice@gallaudet.edu failures=8
+  MEDIUM  excessive_failed_logins_user     user alice@university.edu failures=8
   HIGH    excessive_failed_logins_ip       ip 198.51.100.23 failures=20
-  HIGH    impossible_travel                alice@gallaudet.edu: US -> DE quickly
+  HIGH    impossible_travel                alice@university.edu: US -> DE quickly
   ```
 - Output is **deterministic, explainable, and text-only**.
 
@@ -165,7 +165,7 @@ python main.py --demo langchain1
 - A **synthetic test signal** (string):  
 
   ```
-  "Multiple login failures for alice@gallaudet.edu from 198.51.100.23 over 10 minutes."
+  "Multiple login failures for alice@university.edu from 198.51.100.23 over 10 minutes."
   ```
 - Uses `triage_chain` in `chains/chains.py`.
 
@@ -178,7 +178,7 @@ python main.py --demo langchain1
 
   ```
   - High likelihood of brute-force attempt.
-  - User account alice@gallaudet.edu may be compromised.
+  - User account alice@university.edu may be compromised.
   - Recommend temporary lockout and MFA enforcement.
   ```
 
@@ -245,7 +245,7 @@ python main.py --demo simple_agents
 
   ```
   [LogLoader]
-  excessive_failed_logins_user | medium | user alice@gallaudet.edu failures=8
+  excessive_failed_logins_user | medium | user alice@university.edu failures=8
 
   [ThreatAnalyst]
   - Multiple login failures may indicate credential stuffing.
@@ -313,7 +313,7 @@ python main.py --demo hybrid
 
   ```
   == Prioritized risks (LangChain) ==
-  - High: Burst of login failures for alice@gallaudet.edu
+  - High: Burst of login failures for alice@university.edu
   - Medium: Impossible travel from US -> DE
 
   == Planner ==
@@ -323,7 +323,7 @@ python main.py --demo hybrid
 
   == Executor ==
   - Item: Find failed logins for Alice
-    Command: grep 'alice@gallaudet.edu' $FILE | grep '"result":"FAILURE"'
+    Command: grep 'alice@university.edu' $FILE | grep '"result":"FAILURE"'
   - Item: Count unique IPs
     Command: jq '.client.ipAddress' $FILE | sort | uniq -c
   ```
