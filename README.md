@@ -1,407 +1,176 @@
-# 🛡️ Agentic Threat Analyst — Okta System Logs
+# 🛡️ Agentic Threat Analyst — Okta System Logs (LM Studio / OpenAI‑compatible)
 
-### AutoGen + LangChain + Hugging Face + Deterministic Rules  
-**An end-to-end local, explainable multi-agent system for Okta security log triage**
+**Deterministic rules + LangChain reasoning + lightweight agents. 100% local, LM Studio endpoint.**
 
----
-
-## 🔍 Overview
-
-This project demonstrates how to build an **Agentic AI Threat Analyst** system that ingests **Okta System Logs** (`okta-logs.txt`), identifies suspicious activity, and produces human-readable triage reports — all **offline and privacy-preserving**.
-
-This project was inspired by the *MarkTechPost* tutorial —  
-_“How I Built an Intelligent Multi-Agent System with AutoGen, LangChain, and Hugging Face” (Oct 2025)_ —  
-but adapts it for a **cybersecurity use case**: analyzing authentication and identity events from Okta.
-
-The framework incrementally combines:
-
-1. **Rule-based detection** (deterministic, explainable)
-2. **LLM summarization and planning** (LangChain LCEL)
-3. **Multi-agent collaboration** (AutoGen-inspired)
-4. **Hybrid symbolic + neural reasoning** with guardrails
+> ✅ This README is up‑to‑date with the current codebase (OpenAI‑compatible endpoint via LM Studio, `langchain-openai`, and the new `hybrid` pipeline).
 
 ---
 
-## 🧠 Key Concepts
+## Overview
 
-| Component | Purpose | Framework |
-|------------|----------|------------|
-| **LangChain** | Builds reasoning and planning chains for triage and investigation | `langchain`, `langchain-community` |
-| **AutoGen (simulated)** | Demonstrates conceptual multi-agent orchestration | `autogen` (conceptual only, no API calls) |
-| **Hugging Face Transformers** | Provides local LLM backbone (`microsoft/Phi-3-mini-4k-instruct`) | `transformers`, `accelerate` |
-| **Rule Engine** | Deterministic detection of anomalies (failed logins, impossible travel) | Native Python |
-| **Simple Agents** | Lightweight Hugging Face pipeline wrappers for role-based reasoning | `agents/simple_agent.py` |
+This project ingests **Okta System Logs** (`okta-logs.txt`), detects anomalies with a **deterministic rule engine**, and layers **LLM reasoning** and **agentic planning/execution** on top—while staying **local** by talking to an **OpenAI‑compatible LM Studio** endpoint.
 
----
+**Key parts:**
 
-## ⚙️ Architecture Overview
-
-```
-okta-logs.txt
-│
-▼
-[core/ingest.py]
-└── Normalizes raw JSONL or key=value Okta events
-↓
-[core/rules.py]
-└── Deterministic threat detector (login bursts, impossible travel)
-↓
-[chains/chains.py]
-└── LangChain reasoning chains (triage, planning, execution)
-↓
-[agents/simple_agent.py]
-└── Role-based agents powered by Hugging Face (no API)
-↓
-[autogen_sim/conversation.py]
-└── Conceptual AutoGen workflow simulation
-↓
-[hybrid/hybrid.py]
-└── Combines rules + reasoning + agents
-↓
-Reports + Console Output
-```
+- `core/ingest.py` — Normalizes raw Okta events (JSONL or `key=value`) into a consistent schema.
+- `core/rules.py` — Deterministic `RuleDetector` (failed-login bursts, impossible travel).
+- `chains/chains.py` — Builds an OpenAI‑compatible LangChain LLM and defines LCEL chains (triage, plan, step).
+- `agents/simple_agent.py` — Tiny role‑based agent wrapper for LangChain chat LLMs.
+- `hybrid/hybrid.py` — Flagship pipeline: rules → reasoning → planner → executor with guardrails.
+- `autogen_sim/conversation.py` — Conceptual AutoGen‑style multi‑agent layout (no API calls).
+- `core/report.py` — Tabular CLI output helper.
+- `main.py` — Demo driver.
+- `demos/run_all.py` — Runs all demos in sequence.
+- `config.yaml` — Model + rule configuration (LM Studio base URL, model name, thresholds).
+- `requirements.txt` — LangChain v0.3+ stack (`langchain-openai`) + utilities.
 
 ---
 
-## 🧰 Setup Instructions
+## What’s New (vs older README)
 
-### 1️⃣ Environment Setup
+- ✅ **Switched to LM Studio (OpenAI‑compatible) instead of Hugging Face pipeline** for the demos that need a model.
+- ✅ Uses **`langchain-openai`** and `ChatOpenAI` with **custom `base_url`** (LM Studio) and no real API key required.
+- ✅ Centralized configuration in **`config.yaml`** (`model_name`, `base_url`, `max_new_tokens`, `temperature`).
+- ✅ **Hybrid demo** adds entity‑guardrails and ensures every `- Item:` has a `Command:` line.
+- ✅ **Rules** and **AutoGen concept** demos do **not** require any LLM.
+
+---
+
+## Quick Start
+
+### 1) Install
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Apple Silicon (M-series) users:**  
-PyTorch with MPS acceleration is supported.  
-If missing, install manually:
+> Prefer `uv`?
+> 
+> ```bash
+> uv venv && source .venv/bin/activate
+> uv pip install -r requirements.txt
+> ```
 
-```bash
-pip install torch torchvision torchaudio
+### 2) Point to LM Studio (OpenAI‑compatible)
+Update `config.yaml` (already set to a safe default) **or** use env vars:
+
+- **Default in `config.yaml`:**
+
+```yaml
+model:
+    provider: openai_compat
+    model_name: openai/gpt-oss-20b
+    base_url: http://192.168.1.226:1234/v1
+    max_new_tokens: 768
+    temperature: 0.0
 ```
+  
+- **Environment variables (override if needed):**
 
-If you encounter backend issues:
+  ```bash
+  export OPENAI_BASE_URL=http://<lm-studio-ip>:1234/v1   # or LM_STUDIO_BASE_URL
+  export OPENAI_API_KEY=lm-studio                        # any non-empty string
+  ```
 
-```bash
-export PYTORCH_ENABLE_MPS_FALLBACK=1
-```
+### 3) Add Logs
+Place your Okta export at the repo root.
 
-### 2️⃣ Add Your Okta Logs
-
-Place your Okta export at the project root:
 ```
 okta-logs.txt
 ```
-
-- JSONL format preferred (one event per line)
-- `key=value` lines also supported
-
-### 3️⃣ Configure Your Model
-
-Edit `config.yaml` as needed:
-
-```
-model:
-  hf_model: microsoft/Phi-3-mini-4k-instruct
-  max_new_tokens: 384
-  temperature: 0.0
-rules:
-  failed_login_window_min: 60
-  failed_per_user: 8
-  failed_per_ip: 20
-  impossible_travel_window: 90
-```
+- JSONL preferred (one event per line).  
+- `key=value` lines supported (e.g., `actor.alternateId=alice@example.edu outcome=FAILURE ...`).
 
 ---
 
-## 🚀 Demos and Test Runs
+## Demos
 
-Run via:
+Run:
 
 ```bash
-python main.py --demo <mode>
+python main.py --demo <mode> --input okta-logs.txt
 ```
 
-Each mode builds progressively from deterministic rules → AI reasoning → multi-agent collaboration.
+Modes:
+
+1. **`rules`** — Deterministic engine only (no LLM).
+
+   ```bash
+   python main.py --demo rules
+   ```
+   Prints `SEV | RULE | DETAILS` for findings.
+
+2. **`langchain1`** — Triage chain (summary of a synthetic signal).
+
+   ```bash
+   python main.py --demo langchain1
+   ```
+
+3. **`langchain2`** — Plan + step‑to‑commands.
+
+   ```bash
+   python main.py --demo langchain2
+   ```
+
+4. **`simple_agents`** — Three lightweight agents over rule findings (Loader → Analyst → Responder).
+
+   ```bash
+   python main.py --demo simple_agents
+   ```
+
+5. **`autogen`** — **Conceptual** AutoGen‑style config printed as JSON (no inference).
+
+   ```bash
+   python main.py --demo autogen
+   ```
+
+6. **`hybrid`** — **Flagship** pipeline: rules → reasoning → planner → executor.
+
+   ```bash
+   python main.py --demo hybrid
+   ```
+   - Entity guardrails drop lines mentioning **unknown** emails/IPs.
+   - Executor prompt enforces **jq‑only** (with safe pipes) and real Okta JSON keys.
+   - Post‑processor ensures every `- Item:` is followed by a `Command:`.
+
+> Batch showcase:
+
+> ```bash
+> python demos/run_all.py
+> ```
 
 ---
 
-### 1⃣ Deterministic Rules
+## How It Works
 
-```bash
-python main.py --demo rules
-```
+1. **Ingest/Normalize** (`core/ingest.py`)  
+   - Accepts JSONL or `key=value` lines.  
+   - Coerces timestamps to **ISO‑8601 UTC**.  
+   - Canonical fields: `timestamp`, `event_type`, `message`, `user`, `ip`, `country`, `outcome`, `raw`.
 
-**Input:**  
-- `okta-logs.txt` — a local file containing Okta System Logs (JSONL or key=value lines).  
-- No model or LLM involved.
+2. **Deterministic Rules** (`core/rules.py`)  
+   - Sliding‑window counters for **failed logins per user/IP**.  
+   - **Impossible travel** detection by country variance within a time window.  
+   - Configurable via `config.yaml` (`failed_*`, `impossible_travel_window`).
 
-**Process:**  
-- Parsed and normalized by `core/ingest.py`.  
-- Evaluated by `core/rules.py` (`RuleDetector`) for:  
-  - Excessive failed logins per user/IP  
-  - Impossible travel between countries  
+3. **LLM Reasoning & Chains** (`chains/chains.py`)  
+   - `build_langchain_llm` wraps `ChatOpenAI` with **LM Studio base_url**.  
+   - Chains: `triage_chain`, `plan_chain`, `step_chain` (LCEL).
 
-**Output:**  
-- Printed list of rule-based findings:  
+4. **Agents** (`agents/simple_agent.py`)  
+   - Minimal role‑based wrapper over the shared LLM (memory of exchanges per agent).
 
-  ```
-  == Rule-based findings ==
-  MEDIUM  excessive_failed_logins_user     user alice@university.edu failures=8
-  HIGH    excessive_failed_logins_ip       ip 198.51.100.23 failures=20
-  HIGH    impossible_travel                alice@university.edu: US -> DE quickly
-  ```
-- Output is **deterministic, explainable, and text-only**.
-
----
-
-### 2⃣ LangChain: Threat Triage Chain
-
-```bash
-python main.py --demo langchain1
-```
-
-**Input:**  
-- A **synthetic test signal** (string):  
-
-  ```
-  "Multiple login failures for alice@university.edu from 198.51.100.23 over 10 minutes."
-  ```
-- Uses `triage_chain` in `chains/chains.py`.
-
-**Process:**  
-- Builds a local Hugging Face text-generation pipeline (`Phi-3-mini-4k-instruct`).  
-- Passes the signal through a structured prompt to produce a concise triage summary.
-
-**Output:**  
-- A **3-bullet summary** of risks and recommended actions, for example:
-
-  ```
-  - High likelihood of brute-force attempt.
-  - User account alice@university.edu may be compromised.
-  - Recommend temporary lockout and MFA enforcement.
-  ```
+5. **Hybrid Pipeline** (`hybrid/hybrid.py`)  
+   - **Risk analysis prompt** → bullet list.  
+   - **Guardrails**: `_strip_unknown_entities` removes lines with unseen principals.  
+   - **Planner prompt** groups actions by `[R#]`.  
+   - **Executor prompt** outputs **jq** commands against `okta-logs.txt` only.  
+   - **Repair**: `_ensure_item_commands` fills missing `Command:` lines, using risk‑to‑email hints.
 
 ---
 
-### 3⃣ LangChain: Multi-Step Plan + Execution
-
-```bash
-python main.py --demo langchain2
-```
-
-**Input:**  
-- Goal text (string):  
-
-  ```
-  "Investigate burst of failed Okta logins and possible account takeover"
-  ```
-- Uses two LCEL chains:  
-  - `plan_chain` → creates 3 numbered steps.  
-  - `step_chain` → converts one step into actionable shell commands.
-
-**Process:**  
-- The model generates a procedural plan, then expands one step with concrete `jq`, `grep`, or `awk` commands referencing `okta-logs.txt`.
-
-**Output:**  
-
-```
-Plan:
-1. Identify top failing users.
-2. Extract source IPs and geolocations.
-3. Verify login patterns.
-
-Execution detail:
-- Item: Top failing users
-  Command: jq '. | select(.outcome=="FAILURE") | .actor.alternateId' okta-logs.txt | sort | uniq -c
-```
-
-**Output Type:**  
-- Text printed to console; partially generated by LLM.
-
----
-
-### 4⃣ Simple Multi-Agent Workflow
-
-```bash
-python main.py --demo simple_agents
-```
-
-**Input:**  
-- `okta-logs.txt` — the same as in Demo 1.  
-- Findings from the rule engine are summarized and fed to agents.
-
-**Process:**  
-- Three lightweight agents (`SimpleAgent` objects):
-
-  1. **LogLoader:** Prints structured rule findings.  
-  2. **ThreatAnalyst:** Summarizes risks based on findings.  
-  3. **Responder:** Suggests containment or remediation actions.
-  
-- All agents use the same HF model pipeline, passing messages sequentially.
-
-**Output:**  
-- Textual conversation printed in order:
-
-  ```
-  [LogLoader]
-  excessive_failed_logins_user | medium | user alice@university.edu failures=8
-
-  [ThreatAnalyst]
-  - Multiple login failures may indicate credential stuffing.
-  - Investigate repeated IP addresses.
-  - Consider temporary user lockout.
-
-  [Responder]
-  - Disable affected accounts.
-  - Enforce password reset.
-  - Block offending IP ranges at firewall.
-  ```
-
----
-
-### 5⃣ AutoGen Conceptual Demo
-
-```bash
-python main.py --demo autogen
-```
-
-**Input:**  
-- None (no logs or model required).
-
-**Process:**  
-- Prints a conceptual configuration for a multi-agent system inspired by Microsoft AutoGen.  
-- Defines agent roles (UserProxy, ThreatAnalyst, Responder, Executor) and workflow sequence.
-
-**Output:**  
-- JSON-formatted structure showing how such a system would coordinate:
-
-  ```json
-  {
-    "agents": [
-      {"name": "UserProxy", "type": "user_proxy", "role": "Receives/Supervises task"},
-      {"name": "ThreatAnalyst", "type": "assistant", "role": "Summarizes Okta anomalies"},
-      {"name": "Responder", "type": "assistant", "role": "Proposes containment/validation"},
-      {"name": "Executor", "type": "executor", "role": "Dry-run commands/tools"}
-    ]
-  }
-  ```
-- Conceptual only — no inference.
-
----
-
-### 6⃣ Hybrid Reasoning Pipeline (Flagship Demo)
-
-```bash
-python main.py --demo hybrid
-```
-
-**Input:**  
-- `okta-logs.txt` — primary log dataset.  
-- Model configuration from `config.yaml`.
-
-**Process:**
-
-1. Rule-based engine produces **signals** (deterministic anomalies).  
-2. LangChain reasoning chain summarizes and prioritizes risks.  
-3. **Planner Agent:** Generates numbered containment/validation plan.  
-4. **Executor Agent:** Produces safe, read-only shell commands using `$FILE` variable.  
-5. `_strip_unknown_entities()` ensures model output mentions only real users/IPs from logs.
-
-**Output:**  
-- Three structured sections printed to console:
-
-  ```
-  == Prioritized risks (LangChain) ==
-  - High: Burst of login failures for alice@university.edu
-  - Medium: Impossible travel from US -> DE
-
-  == Planner ==
-  1. Temporarily suspend user account.
-  2. Require MFA reset.
-  3. Block suspicious IP addresses.
-
-  == Executor ==
-  - Item: Find failed logins for Alice
-    Command: grep 'alice@university.edu' $FILE | grep '"result":"FAILURE"'
-  - Item: Count unique IPs
-    Command: jq '.client.ipAddress' $FILE | sort | uniq -c
-  ```
-
-**Output Type:**  
-- Structured text (console).  
-- Grounded, non-hallucinated reasoning pipeline result.
-
-## 🔄 Integration Flow
-
-Here’s what happens when `--demo hybrid` runs:
-
-```
-1️⃣ RuleDetector → extracts signals from Okta logs.
-2️⃣ Reasoning Chain → summarizes into a prioritized risk list.
-3️⃣ Planner Agent → converts that list into 3–5 short containment steps.
-4️⃣ Executor Agent → translates steps into jq/awk/grep commands.
-```
-
-### Dataflow Diagram
-
-```
-Okta JSONL Logs
-   │
-   ▼
-RuleDetector ───► Signals
-   │
-   ▼
-Reasoning Chain (LCEL)
-   │        —> structured, concise risk summary
-   ▼
-Planner Agent (SimpleAgent)
-   │        —> converts summary into actionable steps
-   ▼
-Executor Agent (SimpleAgent)
-   │        —> converts steps into jq/awk/grep shell commands ($FILE=okta-logs.txt)
-   ▼
-Operator Output (dry-run script)
-```
-
-
-
----
-
-### 7⃣ Run All Demos Sequentially
-
-```bash
-python demos/run_all.py
-```
-
-**Input:**  
-- Uses `okta-logs.txt` and built-in test strings.  
-- Executes each of the previous demos in sequence.
-
-**Output:**  
-- Composite printed log showing all modes, in order:  
-
-  ```
-  === DEMO: rules ===
-  ...
-  === DEMO: langchain1 ===
-  ...
-  === DEMO: hybrid ===
-  ✓ Hybrid pipeline complete
-  ```
-
-**Purpose:**  
-- Full showcase of system evolution — ideal for **training**, **presentations**, and **evaluation**.
-
-## 🔐 Privacy & Offline Operation
-
-- 100% local execution — **no external API calls or telemetry**  
-- Suitable for regulated environments (FERPA / GLBA compliant)  
-- Works on CPU, GPU, or Apple Metal (MPS)
-
----
-
-## 📁 Repository Structure
+## Repository Layout
 
 ```
 agentic-threat-analyst-okta/
@@ -409,24 +178,25 @@ agentic-threat-analyst-okta/
 ├─ config.yaml
 ├─ requirements.txt
 ├─ okta-logs.txt
+├─ run.sh
 ├─ main.py
 │
 ├─ core/
-│  ├─ ingest.py      # Parses & normalizes Okta logs
-│  ├─ rules.py       # Deterministic anomaly detection
-│  └─ report.py      # CLI tabular reporting
+│  ├─ ingest.py
+│  ├─ rules.py
+│  └─ report.py
 │
 ├─ agents/
 │  └─ simple_agent.py
 │
-├─ autogen_sim/
-│  └─ conversation.py # Conceptual AutoGen workflow
-│
 ├─ chains/
-│  └─ chains.py       # LangChain reasoning templates
+│  └─ chains.py
 │
 ├─ hybrid/
-│  └─ hybrid.py       # Hybrid symbolic + neural reasoning
+│  └─ hybrid.py
+│
+├─ autogen_sim/
+│  └─ conversation.py
 │
 └─ demos/
    └─ run_all.py
@@ -434,20 +204,62 @@ agentic-threat-analyst-okta/
 
 ---
 
-## 🧩 Future Enhancements
+## Configuration Reference (`config.yaml`)
 
-- Add Okta System Log API ingestion for live analysis  
-- Expand rule catalog (MFA bypass, privilege escalation)  
-- Add correlation visualization and risk scoring  
-- Evaluate LLM reasoning accuracy metrics  
+```yaml
+model:
+  provider: openai_compat
+  model_name: openai/gpt-oss-20b
+  base_url: http://192.168.1.226:1234/v1
+  max_new_tokens: 768
+  temperature: 0.0
+
+rules:
+  failed_login_window_min: 60
+  failed_per_user: 8
+  failed_per_ip: 20
+  impossible_travel_window: 90
+```
+
+> You can override at runtime via environment variables:
+> `OPENAI_BASE_URL`, `OPENAI_API_KEY` (or `LM_STUDIO_BASE_URL`, `LM_STUDIO_API_KEY`).
 
 ---
 
-## 🧾 License
+## Requirements
 
-Open-sourced under **MIT**.  
-All AI reasoning components run locally — no data leaves your machine.
+- Python 3.10+
+- LM Studio running an OpenAI‑compatible chat model (e.g., `openai/gpt-oss-20b`).
+- `jq` in your shell for executor commands (hybrid demo).
+
+Install Python deps:
+
+```bash
+pip install -r requirements.txt
+# or
+uv pip install -r requirements.txt
+```
 
 ---
 
-**Keywords:** Okta, cybersecurity, LangChain, Hugging Face, AutoGen, agentic AI, rule-based detection, explainable AI
+## Privacy & Local‑First
+
+- No external API calls are required; LM Studio runs locally on your network.
+- Suitable for environments with FERPA/GLBA constraints (no telemetry from this repo).
+
+---
+
+## Troubleshooting
+
+- **LLM calls fail / 404:** Verify `OPENAI_BASE_URL` matches LM Studio (e.g., `http://<ip>:1234/v1`).
+- **Model not loaded in LM Studio:** Start a chat model and ensure it supports the OpenAI Chat API.
+- **Empty/Weird jq results:** Confirm your `okta-logs.txt` uses Okta’s JSON keys referenced in prompts.
+- **Performance (Apple Silicon):** LM Studio model choice matters; try a smaller chat model for quick tests.
+
+---
+
+## License
+
+MIT — see `LICENSE` (or include one).
+
+**Keywords:** Okta, cybersecurity, LM Studio, LangChain, LCEL, ChatOpenAI, jq, agentic AI, deterministic rules, incident response
