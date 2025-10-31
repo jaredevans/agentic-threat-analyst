@@ -460,3 +460,127 @@ Console output (3 sections) ──► Done
 - **Explainable**: Deterministic rules produce auditable seeds for the LLM.
 - **Safe**: Guardrails delete lines with unknown users/IPs; executor is jq‑only, read‑only.
 - **Practical**: Post‑processor fills in missing commands so the output is always actionable.
+
+
+---
+
+## 🧠 Agent Roles, Purpose, and Configuration
+
+The **Agentic Threat Analyst** uses lightweight, role-based agents to simulate a security operations (SOC) workflow.  
+Each agent shares the same **LLM instance** (from `build_langchain_llm`) for consistency but maintains its **own memory log** of interactions.
+
+### 1️⃣ Agent Design ( `agents/simple_agent.py` )
+Each agent is an instance of the `SimpleAgent` class:
+
+```python
+class SimpleAgent:
+    def __init__(self, name: str, role: str, llm, *, max_input_chars: int = 8000):
+        self.name = name
+        self.role = role
+        self.llm = llm
+        self.memory = []
+```
+- **`name`** — human-readable identifier (e.g., `"ThreatAnalyst"`).  
+- **`role`** — description injected into the system prompt (e.g., `"Okta security analyst"`).  
+- **`llm`** — the shared LangChain LLM (OpenAI-compatible LM Studio endpoint).  
+- **`memory`** — stores `{user, agent}` message pairs for that specific agent (local-only, not fed back).  
+- **`max_input_chars`** — clips long messages to prevent token overflows.  
+
+Each `SimpleAgent` builds a reusable chain:
+
+```python
+self._prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are {name}: {role}. Follow instructions exactly. "
+               "Do not invent users, IPs, devices, or events. "
+               "If needed info is missing, say 'No data'."),
+    ("user", "{message}")
+])
+self._chain = self._prompt | self.llm | StrOutputParser()
+```
+
+**Behavior:**  
+- Each time you call `.say(message)`, the agent composes a message using that fixed prompt and returns a one-shot reply.  
+- No multi-turn context is carried forward (but the history is logged in `.memory` if needed for debugging or analytics).  
+
+---
+
+### 2️⃣ Agents in Use ( `main.py --demo simple_agents` )
+In the **Simple Agents demo**, three agents are instantiated and run sequentially over the same shared LLM:
+
+| Agent | Role | Purpose |
+|--------|------|----------|
+| 🧾 **LogLoader** | "log ingestion specialist" | Receives findings from the deterministic rule engine and formats them as text. |
+| 🧠 **ThreatAnalyst** | "Okta security analyst" | Summarizes risks and patterns from rule-based findings using concise, data-grounded language. |
+| 🛡️ **Responder** | "incident responder" | Suggests immediate containment or remediation actions based on the analyst’s output. |
+
+**Pipeline flow:**  
+1. `LogLoader` prints the normalized list of anomalies (e.g., excessive failed logins, impossible travel).  
+2. `ThreatAnalyst.say()` summarizes risk implications from those anomalies.  
+3. `Responder.say()` proposes incident response steps given the analysis.
+
+Example run:
+
+```text
+[LogLoader]
+excessive_failed_logins_user | medium | user alice@example.edu failures=9
+
+[ThreatAnalyst]
+- Repeated failed logins suggest possible credential stuffing.
+- Investigate source IPs and geolocation anomalies.
+
+[Responder]
+- Lock the affected account temporarily.
+- Require MFA reset.
+- Block IPs showing repeated failures.
+```
+
+---
+
+### 3️⃣ Agents in Hybrid Mode
+During the **hybrid run** (`--demo hybrid`):
+
+- Agents are not explicitly constructed, but **their logic is embedded** into the multi-prompt flow:
+  - The **LLM reasoning prompt** plays the role of the **ThreatAnalyst**.
+  - The **Planner prompt** acts as the **Responder**, suggesting actions.
+  - The **Executor prompt** simulates a **Command Engineer** role that converts each plan step into concrete jq commands.
+- These roles are implicit, but they mirror the same chain-of-responsibility structure as the explicit agents demo.
+
+---
+
+### 4️⃣ Configuring Agents or Adding New Ones
+
+To add or adjust an agent:
+
+1. **Define the role and tone** — edit or expand the system message in `SimpleAgent`.
+2. **Adjust memory behavior** — if you want conversational persistence, include prior turns in the next `.say()` prompt (or use `RunnableWithMessageHistory`).
+3. **Add a new stage** — for example:
+
+```python
+   reviewer = SimpleAgent("Reviewer", "validates responder actions for compliance", llm)
+   review = reviewer.say(f"Evaluate these response actions:
+{response}")
+   print("[Reviewer]\n" + review)
+```
+
+4. **Parallelize** — you can run multiple agents concurrently with asyncio or threads since they all share a read-only LLM client.
+
+---
+
+### 5️⃣ Why Agents?
+
+| Advantage | Description |
+|------------|-------------|
+| **Transparency** | Each agent produces its own output block, so reasoning steps are human-auditable. |
+| **Reusability** | The same `SimpleAgent` class can represent any role just by changing its prompt. |
+| **Scalability** | New roles (e.g., *Forensic Examiner*, *Compliance Reviewer*) can be dropped in without changing the architecture. |
+| **Performance** | Reuses one shared LLM connection; avoids redundant model re-initialization. |
+
+---
+
+### 6️⃣ Future Extensions
+- Add **real memory replay** using LangChain’s `ConversationBufferMemory` or `RunnableWithMessageHistory`.
+- Connect a **vector store** (e.g., FAISS or Chroma) to let agents recall prior investigations.
+- Introduce **coordination logic** (a lightweight “Orchestrator”) to decide which agent should act next.
+- Extend roles to **MFA enforcement**, **privilege escalation detection**, or **user behavior baselining**.
+
+---
