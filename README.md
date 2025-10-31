@@ -2,8 +2,6 @@
 
 **Deterministic rules + LangChain reasoning + lightweight agents. 100% local, LM Studio endpoint.**
 
-> ✅ This README is up‑to‑date with the current codebase (OpenAI‑compatible endpoint via LM Studio, `langchain-openai`, and the new `hybrid` pipeline).
-
 ---
 
 ## Overview
@@ -29,16 +27,6 @@ but adapts it for a **cybersecurity use case**: analyzing authentication and ide
 - `demos/run_all.py` — Runs all demos in sequence.
 - `config.yaml` — Model + rule configuration (LM Studio base URL, model name, thresholds).
 - `requirements.txt` — LangChain v0.3+ stack (`langchain-openai`) + utilities.
-
----
-
-## What’s New (vs older README)
-
-- ✅ **Switched to LM Studio (OpenAI‑compatible) instead of Hugging Face pipeline** for the demos that need a model.
-- ✅ Uses **`langchain-openai`** and `ChatOpenAI` with **custom `base_url`** (LM Studio) and no real API key required.
-- ✅ Centralized configuration in **`config.yaml`** (`model_name`, `base_url`, `max_new_tokens`, `temperature`).
-- ✅ **Hybrid demo** adds entity‑guardrails and ensures every `- Item:` has a `Command:` line.
-- ✅ **Rules** and **AutoGen concept** demos do **not** require any LLM.
 
 ---
 
