@@ -1,8 +1,13 @@
 # Configuration for deterministic rules and model defaults
+# Switched to OpenAI-compatible endpoint (LM Studio).
 
 model:
-  hf_model: microsoft/Phi-3-mini-4k-instruct
-  max_new_tokens: 384
+  provider: openai_compat
+  model_name: openai/gpt-oss-20b
+  # The app reads OPENAI_BASE_URL and OPENAI_API_KEY from environment.
+  # Defaults below are safe for LM Studio; override via env if needed.
+  base_url: http://192.168.1.226:1234/v1
+  max_new_tokens: 768 
   temperature: 0.0
 
 rules:

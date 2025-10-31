@@ -1,31 +1,15 @@
 # ================================
 # Agentic Threat Analyst — Okta Logs
 # Requirements (LangChain v0.3+ compatible)
+# Switched to OpenAI-compatible LM Studio endpoint.
 # ================================
 
-# Core LLM & orchestration stack (split packages)
 langchain-core>=0.3.0
 langchain-community>=0.3.0
-langchain-huggingface>=0.1.0
+langchain-openai>=0.2.0
 
-# Transformers + Accelerate (for Hugging Face pipelines)
-transformers>=4.44.0
-accelerate>=0.33.0
-
-# PyTorch — optional on Apple Silicon (MPS works via system torch)
-torch>=2.3.0; platform_system != "Darwin" or platform_machine != "arm64"
-
-# Optional visualization / tensor utils
-einops>=0.8.0
-
-# YAML configuration and CLI tabulation
 pyyaml>=6.0.1
 tabulate>=0.9.0
 
-# Optional: deterministic autogen simulation (conceptual only)
+# Optional: conceptual autogen demo (no API calls)
 autogen>=0.3.0
-
-# (macOS ARM users)
-# If you encounter MPS backend issues, set:
-#   export PYTORCH_ENABLE_MPS_FALLBACK=1
-# before running.

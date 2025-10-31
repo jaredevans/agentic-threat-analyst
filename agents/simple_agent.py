@@ -1,11 +1,23 @@
 # agents/simple_agent.py
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 class SimpleAgent:
-    def __init__(self, name: str, role: str, pipe, *, max_input_chars: int = 8000):
+    def __init__(self, name: str, role: str, llm, *, max_input_chars: int = 8000):
+        """`llm` is a LangChain-chat-compatible Runnable (e.g., ChatOpenAI)."""
         self.name = name
         self.role = role
-        self.pipe = pipe
+        self.llm = llm
         self.memory = []
         self.max_input_chars = max_input_chars
+
+        self._prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are {name}: {role}. Follow instructions exactly. "
+                        "Do not invent users, IPs, devices, or events. "
+                        "If needed info is missing, say 'No data'."),
+            ("user", "{message}")
+        ])
+        self._chain = self._prompt | self.llm | StrOutputParser()
 
     def _clip(self, s: str) -> str:
         # keep tail (latest context) if too long
@@ -13,23 +25,6 @@ class SimpleAgent:
 
     def say(self, message: str) -> str:
         message = self._clip(message)
-        prompt = (
-            "<s><|user|>\n"
-            f"You are {self.name}: {self.role}\n"
-            "Follow instructions exactly. Do not invent users, IPs, devices, or events. "
-            "If needed info is missing, say 'No data'.\n\n"
-            f"{message}\n"
-            "<|end|>\n<|assistant|>\n"
-        )
-        # Deterministic, cache-safe call with light anti-repetition
-        out = self.pipe(
-            prompt,
-            do_sample=False,
-            top_p=None,
-            temperature=0.0,
-            repetition_penalty=1.05,
-            no_repeat_ngram_size=3,
-            return_full_text=False,
-        )[0]["generated_text"]
+        out = self._chain.invoke({"name": self.name, "role": self.role, "message": message})
         self.memory.append({"user": message, "agent": out})
         return out
