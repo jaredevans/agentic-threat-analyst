@@ -1,6 +1,6 @@
-# 🛡️ Agentic Threat Analyst — Okta System Logs (LM Studio / OpenAI‑compatible)
+# 🛡️ Agentic Threat Analyst
 
-**Deterministic rules + LangChain reasoning + lightweight agents. 100% local, LM Studio endpoint.**
+**Deterministic rules + LangChain reasoning + lightweight agents. 100% local, openai-compatible LM Studio endpoint.**
 
 ---
 
