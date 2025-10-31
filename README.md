@@ -321,3 +321,142 @@ uv pip install -r requirements.txt
 MIT — see `LICENSE` (or include one).
 
 **Keywords:** Okta, cybersecurity, LM Studio, LangChain, LCEL, ChatOpenAI, jq, agentic AI, deterministic rules, incident response
+
+
+---
+
+## 🔧 What Happens During a Hybrid Run (`--demo hybrid`)
+
+The **hybrid** pipeline is the flagship end‑to‑end path that combines deterministic signals with tightly‑scoped LLM reasoning and post‑processing guardrails. Here’s the exact sequence, mapped to source files and important functions.
+
+### 1) Ingest & Normalize ( `core/ingest.py` )
+1. `load_and_normalize(log_path)`
+   - Reads `okta-logs.txt` as **JSONL** (preferred) or **key=value** lines.
+   - Parses key/value lines with `parse_kv_line` (supports dotted keys like `client.ipAddress` and quoted values).
+   - Timestamps are coerced to **ISO‑8601 UTC** by `_to_iso` (epoch ms/s, or ISO with/without `Z` → always UTC).
+   - Each raw event is normalized to a canonical dict:
+     - `timestamp`, `event_type`, `message`, `user`, `ip`, `country`, `outcome`, `raw`
+   - Output is chronologically **sorted** by `timestamp`.
+
+### 2) Deterministic Rule Signals ( `core/rules.py` )
+2. `RuleDetector().evaluate(evt)` across events:
+   - **Failed login bursts**: sliding windows for per‑user and per‑IP failures using `deque`s.
+   - **Impossible travel**: country changes within a short time window.
+   - Thresholds from `config.yaml` → `rules.*` (e.g., `failed_per_user: 8`, `failed_per_ip: 20`, `impossible_travel_window: 90` minutes).
+   - Emits tuples `(rule_name, severity, details)`, e.g.:
+     - `("excessive_failed_logins_user", "medium", "user alice@example.edu failures=9")`
+     - `("excessive_failed_logins_ip", "high", "ip 198.51.100.23 failures=24")`
+     - `("impossible_travel", "high", "alice@example.edu: US -> JP quickly")`
+3. The first ~15 findings are joined into a **signals** string for the LLM.
+
+### 3) Build One Shared LLM ( `chains/chains.py` )
+4. `llm = build_langchain_llm(model_name, max_new_tokens, temp)`
+   - Wraps `langchain_openai.ChatOpenAI` pointed at an **OpenAI‑compatible** LM Studio endpoint.
+   - Endpoint resolution (in priority order): `OPENAI_BASE_URL` → `LM_STUDIO_BASE_URL` → default in `config.yaml`.
+   - API key: `OPENAI_API_KEY` → `LM_STUDIO_API_KEY` → default `"lm-studio"` (LM Studio ignores the value but requires non‑empty).  
+   - Returns a **Runnable** that takes a string and returns `.content` text.
+
+### 4) Risk Reasoning (LangChain Prompt)
+5. A structured **reasoning prompt** is run through the LLM to turn signals into a short prioritized list:
+   - Guardrails in the prompt: *“Use ONLY the signals given; do not invent users/IPs; if missing, say ‘No data’.”*
+   - Output: bullet list of risks with terse justifications.
+
+### 5) Anti‑Hallucination Guardrail
+6. `_allowed_users_and_ips(evts)` collects the **actual** users/IPs seen in the current log window.
+7. `_strip_unknown_entities(text, allowed_users, allowed_ips)` removes any lines that mention **unseen** principals.
+
+### 6) Risk Numbering & Email Hints
+8. `_tag_risks(analysis_text)` extracts bullets and labels them `R1`, `R2`, … (keeps original order).
+9. `_extract_risk_email_map(risk_items)` builds `{R#: email_or_None}` to help the executor infer user‑scoped commands later.
+   - Example: `{ "R1": "alice@example.edu", "R2": None, ... }`
+
+### 7) Planner (Grouped, Concise Actions)
+10. **Planner prompt** (LangChain) consumes the labeled risks and emits **grouped actions**:
+    ```
+    [R1] <one‑line risk>
+    - <action 1>
+    - <action 2>
+    - <action 3>
+    ```
+    - Prompt forbids invented users/IPs.  
+    - Output is again sanitized with `_strip_unknown_entities(...)`.
+
+### 8) Executor (jq‑only, Strict Schema)
+11. **Executor prompt** generates command blocks **per risk** using **only** allowed Okta JSON keys:
+    - Keys permitted in the prompt:
+      - `.actor.alternateId`
+      - `.outcome.result`
+      - `.request.ipChain[0].ip`, `.client.ipAddress`
+      - `.request.ipChain[0].geographicalContext.country`, `.client.geographicalContext.country`
+      - `.published`
+    - **Constraints**:
+      - Read‑only commands against **`okta-logs.txt`** (no `$FILE` indirection).
+      - Allowed pipes: `sort | uniq -c | sort -nr | head | wc -l | column -t`.
+      - If a valid jq can’t be formed → **`Command: No data`**.
+    - **Required format** per risk:
+      ```
+      [R#]
+      - Item: <what>
+        Command: <jq ... okta-logs.txt>
+      - Item: ...
+        Command: ...
+      ```
+12. Post‑processing: `_ensure_item_commands(text, risk_email_map)` guarantees **every** `- Item:` line is immediately followed by a `Command:` line.
+    - Uses `_infer_command(item_line, user_hint)`:
+      - Detects an email in the item text or falls back to the risk’s email hint.
+      - Emits safe jq patterns (timeline, failed counts, IP aggregation, country list, JP‑origin timestamps, etc.).
+      - If inference is unsafe/insufficient → `Command: No data`.
+
+### 9) Output Sections
+13. The pipeline prints three blocks to the console:
+    - `== Prioritized risks (LangChain) ==`  
+      *Guardrailed bullets from the reasoning step.*
+    - `== Risk IDs ==`  
+      *`R#:` lines mapping IDs to the bullet text (also powering email hints).*  
+    - `== Executor ==`  
+      *Per‑risk itemized jq commands against `okta-logs.txt` (fully grounded).*
+
+### 10) Completion
+14. Prints `✓ Hybrid pipeline complete` to confirm the end of run.
+
+---
+
+### Dataflow Recap
+
+```text
+okta-logs.txt
+    │
+    ▼
+load_and_normalize ──► events (UTC timestamps, canonical fields)
+    │
+    ▼
+RuleDetector.evaluate ──► findings (signals string)
+    │
+    ▼
+LLM (reasoning prompt) ──► prioritized risks (bullets)
+    │
+    ▼   (filter by known users/IPs)
+_strip_unknown_entities
+    │
+    ├─► _tag_risks / _extract_risk_email_map ──► R# labels + hints
+    │
+    ▼
+LLM (planner prompt) ──► grouped actions by [R#]
+    │
+    ▼
+LLM (executor prompt) ──► jq commands per [R#] (okta-logs.txt only)
+    │
+    ▼   (repair)
+_ensure_item_commands ──► guaranteed Command lines
+    │
+    ▼
+Console output (3 sections) ──► Done
+```
+
+---
+
+### Why This Design?
+- **Grounded**: Every LLM step is fenced to the provided signals and real Okta keys.
+- **Explainable**: Deterministic rules produce auditable seeds for the LLM.
+- **Safe**: Guardrails delete lines with unknown users/IPs; executor is jq‑only, read‑only.
+- **Practical**: Post‑processor fills in missing commands so the output is always actionable.
