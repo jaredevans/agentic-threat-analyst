@@ -164,6 +164,72 @@ Modes:
 
 ---
 
+## Sample Run
+
+```
+== Prioritized risks (LangChain) ==
+- **High** – *Impossible travel* (alice@company.com: US → JP in a short time)
+  • Indicates potential credential compromise or account hijacking.
+
+- **Medium** – *Excessive failed logins* (charlie@company.com, 8–11 failures)
+  • Brute‑force attempt; account may be under attack.
+
+- **Medium** – *Excessive failed logins* (eve@company.com, 8–11 failures)
+  • Same risk as above; multiple attempts suggest targeted probing.
+
+- **Medium** – *Excessive failed logins* (frank@company.com, 8–11 failures)
+  • Indicates possible credential guessing or compromised credentials.
+
+== Risk IDs ==
+R1: **High** – *Impossible travel* (alice@company.com: US → JP in a short time)
+R2: **Medium** – *Excessive failed logins* (charlie@company.com, 8–11 failures)
+R3: **Medium** – *Excessive failed logins* (eve@company.com, 8–11 failures)
+R4: **Medium** – *Excessive failed logins* (frank@company.com, 8–11 failures)
+
+== Planner ==
+[R1] Impossible travel (alice@company.com: US → JP in a short time)
+- Verify travel itinerary and timestamps with HR.
+- Temporarily lock the account until verification completes.
+- Enable MFA for all future logins.
+
+[R2] Excessive failed logins (charlie@company.com, 8–11 failures)
+- Lock the account and require password reset.
+- Review login logs for suspicious IPs.
+- Enforce MFA on next successful login.
+
+[R3] Excessive failed logins (eve@company.com, 8–11 failures)
+- Lock the account and require password reset.
+- Check for brute‑force patterns in logs.
+- Enable MFA on next successful login.
+
+[R4] Excessive failed logins (frank@company.com, 8–11 failures)
+- Lock the account and require password reset.
+- Investigate login attempts for unusual IPs.
+- Enable MFA on next successful login.
+
+== Executor ==
+[R1]
+- Item: Alice – timeline (time, result, IP, country)
+
+  Command: jq -r 'select(.actor.alternateId=="alice@company.com") | [.published, .outcome.result, (.request.ipChain[0].ip // .client.ipAddress), (.request.ipChain[0].geographicalContext.country // .client.geographicalContext.country)] | @tsv' okta-logs.txt | sort
+[R2]
+- Item: Charlie – count of failed login attempts
+
+  Command: jq -r 'select(.actor.alternateId=="charlie@company.com" and .outcome.result=="FAILURE") | .actor.alternateId' okta-logs.txt | wc -l
+[R3]
+- Item: Eve – count of failed login attempts
+
+  Command: jq -r 'select(.actor.alternateId=="eve@company.com" and .outcome.result=="FAILURE") | .actor.alternateId' okta-logs.txt | wc -l
+[R4]
+- Item: Frank – count of failed login attempts
+  Command: jq -r 'select(.actor.alternateId=="frank@company.com" and .outcome.result=="FAILURE") | .actor.alternateId' okta-logs.txt | wc -l
+
+✓ Hybrid pipeline complete
+
+```
+
+----
+
 ## Repository Layout
 
 ```
