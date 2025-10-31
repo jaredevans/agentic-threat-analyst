@@ -10,7 +10,7 @@ This project demonstrates how to build an **Agentic AI Threat Analyst** system t
 
 This project ingests **Okta System Logs** (`okta-logs.txt`), detects anomalies with a **deterministic rule engine**, and layers **LLM reasoning** and **agentic planning/execution** on top—while staying **local** by talking to an **OpenAI‑compatible LM Studio** endpoint.
 
-This project was inspired by the *MarkTechPost* tutorial — _“How I Built an Intelligent Multi-Agent System with AutoGen, LangChain, and Hugging Face” (Oct 2025)_  — but adapts it for a **cybersecurity use case**: analyzing authentication and identity events from Okta.
+This project was inspired by the [*MarkTechPost* tutorial](https://www.marktechpost.com/2025/10/21/how-i-built-an-intelligent-multi-agent-systems-with-autogen-langchain-and-hugging-face-to-demonstrate-practical-agentic-ai-workflows/) — _“How I Built an Intelligent Multi-Agent System with AutoGen, LangChain, and Hugging Face” (Oct 2025)_  — but adapts it for a **cybersecurity use case**: analyzing authentication and identity events from Okta.
 
 **Key parts:**
 
