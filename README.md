@@ -151,7 +151,7 @@ Modes:
    - Chains: `triage_chain`, `plan_chain`, `step_chain` (LCEL).
 
 4. **Agents** (`agents/simple_agent.py`)  
-   - Minimal role‑based wrapper over the shared LLM (memory of exchanges per agent).
+   - Minimal role‑based wrapper over the shared LLM.
 
 5. **Hybrid Pipeline** (`hybrid/hybrid.py`)  
    - **Risk analysis prompt** → bullet list.  
